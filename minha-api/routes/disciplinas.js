@@ -8,6 +8,8 @@ let disciplinas = [
 ];
 let ultimoId = 4;
 
+
+// READ ALL
 router.get("/", (req, res) => {
   const { curso } = req.query;
   const resultado = curso
@@ -16,6 +18,7 @@ router.get("/", (req, res) => {
   res.status(200).json({ total: resultado.length, disciplinas: resultado });
 });
 
+// READ FOR ID
 router.get("/:id", (req, res) => {
   const id = parseInt(req.params.id);
   if (isNaN(id)) {
@@ -28,6 +31,8 @@ router.get("/:id", (req, res) => {
   res.status(200).json(disciplina);
 });
 
+
+// CREATE NEW DISCIPLINA
 router.post("/", (req, res) => {
   const { nome, codigo, curso } = req.body;
   if (!nome || !codigo || !curso) {
@@ -54,6 +59,7 @@ router.post("/", (req, res) => {
     .json(novoDisciplina);
 });
 
+// UPDATE DISCIPLINA
 router.put("/:id", (req, res) => {
   const id = parseInt(req.params.id);
     const { nome, codigo, curso } = req.body;
@@ -70,15 +76,7 @@ router.put("/:id", (req, res) => {
   res.status(200).json(disciplinas[indice]);
 });
 
-router.patch("/:id", (req, res) => {
-  const id = parseInt(req.params.id);
-  const indice = disciplinas.findIndex((a) => a.id === id);
-  if (indice === -1) {
-    return res.status(404).json({ erro: "Disciplina não encontrada" });
-  }
-  disciplinas[indice] = { ...disciplinas[indice], ...req.body, id };
-  res.status(200).json(disciplinas[indice]);
-});
+// DELETE DISCIPLINA
 router.delete("/:id", (req, res) => {
   const id = parseInt(req.params.id);
   const indice = disciplinas.findIndex((a) => a.id === id);
