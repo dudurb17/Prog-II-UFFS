@@ -1,37 +1,37 @@
-const { matriculas, disciplinas } = require("../db/data");
-const AlunoModel = require("./alunoModel");
-const DisciplinaModel = require("./disciplinaModel");
+const db = require("../../models");
+const { createHttpError } = require("../utils/http");
 
-function matricular(alunoId, disciplinaId) {
-  if (disciplinaId == null || disciplinaId === "") {
-    throw new Error("Campos obrigatórios ausentes");
-  }
-  const aluno = AlunoModel.buscarPorId(alunoId);
-  if (!aluno) throw new Error("Aluno não encontrado");
-  const disciplina = DisciplinaModel.buscarPorId(disciplinaId);
-  if (!disciplina) throw new Error("Disciplina não encontrada");
-  const jaMatriculado = matriculas.find(
-    (m) => m.alunoId === alunoId && m.disciplinaId === disciplinaId,
-  );
-  if (jaMatriculado) {
-    throw new Error("Aluno já matriculado nesta disciplina");
-  }
-  if (disciplina.vagas <= 0) {
-    throw new Error("Vagas esgotadas para esta disciplina");
-  }
-  disciplina.vagas -= 1;
-  const novaMatricula = { alunoId, disciplinaId };
-  matriculas.push(novaMatricula);
-  return novaMatricula;
+async function matricular(alunoId, disciplinaId) {
+  return db.sequelize.transaction(async (transaction) => {
+    const aluno = await db.Aluno.findByPk(alunoId, { transaction });
+    if (!aluno) throw createHttpError("Aluno nao encontrado", 404);
+
+    const disciplina = await db.Disciplina.findByPk(disciplinaId, { transaction });
+    if (!disciplina) throw createHttpError("Disciplina nao encontrada", 404);
+
+    if (disciplina.vagas <= 0) {
+      throw createHttpError("Vagas esgotadas para esta disciplina", 409);
+    }
+
+    const jaMatriculado = await db.Matricula.findOne({
+      where: { id_aluno: alunoId, id_disciplina: disciplinaId },
+      transaction,
+    });
+    if (jaMatriculado) {
+      throw createHttpError("Aluno ja matriculado nesta disciplina", 409);
+    }
+
+    await disciplina.update({ vagas: disciplina.vagas - 1 }, { transaction });
+    return db.Matricula.create({ id_aluno: alunoId, id_disciplina: disciplinaId }, { transaction });
+  });
 }
 
-function listarDisciplinasPorAluno(alunoId) {
-  const aluno = AlunoModel.buscarPorId(alunoId);
-  if (!aluno) return null;
-  const disciplinasDoAluno = matriculas
-    .filter((m) => m.alunoId === alunoId)
-    .map((m) => disciplinas.find((d) => d.id === m.disciplinaId));
-  return { aluno, disciplinas: disciplinasDoAluno };
+async function listarDisciplinasPorAluno(alunoId) {
+  const aluno = await db.Aluno.findByPk(alunoId, {
+    include: [{ model: db.Disciplina, as: "disciplinas", through: { attributes: [] } }],
+  });
+  if (!aluno) throw createHttpError("Aluno nao encontrado", 404);
+  return { aluno, disciplinas: aluno.disciplinas };
 }
 
 module.exports = { matricular, listarDisciplinasPorAluno };

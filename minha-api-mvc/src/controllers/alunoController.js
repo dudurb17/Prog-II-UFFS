@@ -1,79 +1,81 @@
 const AlunoModel = require("../models/alunoModel");
 const MatriculaModel = require("../models/matriculaModel");
+const { parseId, mapSequelizeError } = require("../utils/http");
 
-function listar(req, res) {
-  const { curso } = req.query;
-  const alunos = AlunoModel.listarTodos({ curso });
+async function listar(req, res) {
+  const alunos = await AlunoModel.listarTodos({ curso: req.query.curso });
   res.status(200).json({ total: alunos.length, alunos });
 }
 
-function buscar(req, res) {
-  const id = parseInt(req.params.id);
-  if (isNaN(id)) return res.status(400).json({ erro: "ID inválido" });
-  const aluno = AlunoModel.buscarPorId(id);
-  if (!aluno) return res.status(404).json({ erro: "Aluno não encontrado" });
+async function buscar(req, res) {
+  const id = parseId(req.params.id);
+  const aluno = await AlunoModel.buscarPorId(id);
+  if (!aluno) return res.status(404).json({ erro: "Aluno nao encontrado" });
   res.status(200).json(aluno);
 }
-function criar(req, res) {
+
+async function criar(req, res, next) {
   try {
-    const novoAluno = AlunoModel.criar(req.body);
-    res
+    const novoAluno = await AlunoModel.criar(req.body);
+    return res
       .status(201)
       .set("Location", "/api/alunos/" + novoAluno.id)
       .json(novoAluno);
   } catch (err) {
-    res.status(400).json({ erro: err.message });
+    const mapped = mapSequelizeError(err);
+    if (mapped.statusCode) {
+      return res
+        .status(mapped.statusCode)
+        .json({ erro: mapped.message, detalhes: mapped.details });
+    }
+    return next(mapped);
   }
 }
-function atualizar(req, res) {
-  const id = parseInt(req.params.id);
-  const aluno = AlunoModel.atualizar(id, req.body);
-  if (!aluno) return res.status(404).json({ erro: "Aluno não encontrado" });
-  res.status(200).json(aluno);
+
+async function atualizar(req, res, next) {
+  const id = parseId(req.params.id);
+  try {
+    const aluno = await AlunoModel.atualizar(id, req.body);
+    return res.status(200).json(aluno);
+  } catch (err) {
+    const mapped = mapSequelizeError(err);
+    if (mapped.statusCode) {
+      return res
+        .status(mapped.statusCode)
+        .json({ erro: mapped.message, detalhes: mapped.details });
+    }
+    return next(mapped);
+  }
 }
 
-function remover(req, res) {
-  const id = parseInt(req.params.id);
-  const ok = AlunoModel.remover(id);
-  if (!ok) return res.status(404).json({ erro: "Aluno não encontrado" });
+async function remover(req, res) {
+  const id = parseId(req.params.id);
+  await AlunoModel.remover(id);
   res.status(204).send();
 }
 
-function matricular(req, res) {
-  const alunoId = parseInt(req.params.id);
-  if (isNaN(alunoId)) return res.status(400).json({ erro: "ID inválido" });
+async function matricular(req, res, next) {
+  const alunoId = parseId(req.params.id);
+  const disciplinaId = parseId(req.body.disciplinaId);
+
   try {
-    const novaMatricula = MatriculaModel.matricular(
-      alunoId,
-      req.body.disciplinaId,
-    );
-    res.status(201).json(novaMatricula);
+    const novaMatricula = await MatriculaModel.matricular(alunoId, disciplinaId);
+    return res.status(201).json(novaMatricula);
   } catch (err) {
-    res.status(400).json({ erro: err.message });
+    if (err.statusCode) return res.status(err.statusCode).json({ erro: err.message });
+    return next(err);
   }
 }
 
-function listarMatriculas(req, res) {
-  const alunoId = parseInt(req.params.id);
-  if (isNaN(alunoId)) return res.status(400).json({ erro: "ID inválido" });
-  const resultado = MatriculaModel.listarDisciplinasPorAluno(alunoId);
-  if (!resultado) {
-    return res.status(404).json({ erro: "Aluno não encontrado" });
-  }
-  const { aluno, disciplinas: disciplinasDoAluno } = resultado;
-  res.status(200).json({
+async function listarMatriculas(req, res) {
+  const alunoId = parseId(req.params.id);
+  const { aluno, disciplinas } = await MatriculaModel.listarDisciplinasPorAluno(alunoId);
+
+  return res.status(200).json({
     mensagem: "Disciplinas do aluno " + aluno.nome + " listadas com sucesso",
-    total: disciplinasDoAluno.length,
-    disciplinas: disciplinasDoAluno,
+    total: disciplinas.length,
+    disciplinas,
   });
 }
 
-module.exports = {
-  listar,
-  buscar,
-  criar,
-  atualizar,
-  remover,
-  matricular,
-  listarMatriculas,
-};
+module.exports = { listar, buscar, criar, atualizar, remover, matricular, listarMatriculas };

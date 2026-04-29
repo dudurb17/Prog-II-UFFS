@@ -1,51 +1,30 @@
-const { alunos } = require("../db/data");
+const db = require("../../models");
+const { createHttpError } = require("../utils/http");
 
-let proximoId = 4;
-
-function validarMatricula(matricula) {
-  return /^\d{7}$/.test(matricula);
+async function listarTodos({ curso } = {}) {
+  const where = {};
+  if (curso) where.curso = curso.toUpperCase();
+  return db.Aluno.findAll({ where, order: [["id", "ASC"]] });
 }
 
-function listarTodos(filtros = {}) {
-  let resultado = [...alunos];
-  if (filtros.curso) {
-    resultado = resultado.filter(
-      (a) => a.curso === filtros.curso.toUpperCase(),
-    );
-  }
-  return resultado;
+async function buscarPorId(id) {
+  return db.Aluno.findByPk(id);
 }
 
-function buscarPorId(id) {
-  return alunos.find((a) => a.id === id) || null;
+async function criar(dados) {
+  return db.Aluno.create(dados);
 }
 
-function criar(dados) {
-  if (!dados.nome || !dados.matricula || !dados.curso) {
-    throw new Error("Campos obrigatórios ausentes");
-  }
-  if (!validarMatricula(dados.matricula)) {
-    throw new Error("Formato de matrícula inválido");
-  }
-  const existe = alunos.find((a) => a.matricula === dados.matricula);
-  if (existe) throw new Error("Matrícula já cadastrada");
-  const novoAluno = { id: proximoId++, ...dados };
-  alunos.push(novoAluno);
-  return novoAluno;
+async function atualizar(id, dados) {
+  const aluno = await db.Aluno.findByPk(id);
+  if (!aluno) throw createHttpError("Aluno nao encontrado", 404);
+  await aluno.update(dados);
+  return aluno;
 }
 
-function atualizar(id, dados) {
-  const idx = alunos.findIndex((a) => a.id === id);
-  if (idx === -1) return null;
-  alunos[idx] = { ...alunos[idx], ...dados, id };
-  return alunos[idx];
-}
-
-function remover(id) {
-  const idx = alunos.findIndex((a) => a.id === id);
-  if (idx === -1) return false;
-  alunos.splice(idx, 1);
-  return true;
+async function remover(id) {
+  const deleted = await db.Aluno.destroy({ where: { id } });
+  if (!deleted) throw createHttpError("Aluno nao encontrado", 404);
 }
 
 module.exports = { listarTodos, buscarPorId, criar, atualizar, remover };

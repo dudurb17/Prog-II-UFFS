@@ -1,65 +1,30 @@
-const { disciplinas } = require("../db/data");
+const db = require("../../models");
+const { createHttpError } = require("../utils/http");
 
-let proximoId = 4;
-
-function listarTodos(filtros = {}) {
-  let resultado = [...disciplinas];
-  if (filtros.curso) {
-    resultado = resultado.filter(
-      (d) => d.curso === filtros.curso.toUpperCase(),
-    );
-  }
-  return resultado;
+async function listarTodos({ curso } = {}) {
+  const where = {};
+  if (curso) where.curso = curso.toUpperCase();
+  return db.Disciplina.findAll({ where, order: [["id", "ASC"]] });
 }
 
-function buscarPorId(id) {
-  return disciplinas.find((d) => d.id === id) || null;
+async function buscarPorId(id) {
+  return db.Disciplina.findByPk(id);
 }
 
-function criar(dados) {
-  if (!dados.nome || !dados.codigo || !dados.curso || dados.vagas == null) {
-    throw new Error("Campos obrigatórios ausentes");
-  }
-  const existe = disciplinas.find((d) => d.codigo === dados.codigo);
-  if (existe) throw new Error("Código " + dados.codigo + " já cadastrado");
-  const novo = {
-    id: proximoId++,
-    nome: dados.nome,
-    codigo: dados.codigo,
-    curso: dados.curso,
-    vagas: dados.vagas,
-  };
-  disciplinas.push(novo);
-  return novo;
+async function criar(dados) {
+  return db.Disciplina.create(dados);
 }
 
-function atualizar(id, dados) {
-  if (!dados.nome || !dados.codigo || !dados.curso || dados.vagas == null) {
-    throw new Error("Campos obrigatórios ausentes");
-  }
-  const idx = disciplinas.findIndex((d) => d.id === id);
-  if (idx === -1) return null;
-  disciplinas[idx] = {
-    id,
-    nome: dados.nome,
-    codigo: dados.codigo,
-    curso: dados.curso,
-    vagas: dados.vagas,
-  };
-  return disciplinas[idx];
+async function atualizar(id, dados) {
+  const disciplina = await db.Disciplina.findByPk(id);
+  if (!disciplina) throw createHttpError("Disciplina nao encontrada", 404);
+  await disciplina.update(dados);
+  return disciplina;
 }
 
-function remover(id) {
-  const idx = disciplinas.findIndex((d) => d.id === id);
-  if (idx === -1) return false;
-  disciplinas.splice(idx, 1);
-  return true;
+async function remover(id) {
+  const deleted = await db.Disciplina.destroy({ where: { id } });
+  if (!deleted) throw createHttpError("Disciplina nao encontrada", 404);
 }
 
-module.exports = {
-  listarTodos,
-  buscarPorId,
-  criar,
-  atualizar,
-  remover,
-};
+module.exports = { listarTodos, buscarPorId, criar, atualizar, remover };
